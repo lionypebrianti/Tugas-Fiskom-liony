@@ -3,70 +3,99 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-st.set_page_config(page_title="Dashboard Analisis Nilai Siswa", layout="wide")
+st.set_page_config(page_title="Dashboard Analisis Nilai", layout="wide")
 
-st.title("📊 Dashboard Analisis Data 50 Siswa - 20 Soal")
+st.title("📊 Dashboard Analisis 50 Siswa - 20 Soal")
 
-# Upload file
-uploaded_file = st.file_uploader("Upload file Excel", type=["xlsx"])
+# Load data langsung dari file
+@st.cache_data
+def load_data():
+    return pd.read_excel("data_simulasi_50_siswa_20_soal.xlsx")
 
-if uploaded_file is not None:
-    df = pd.read_excel(uploaded_file)
+try:
+    df = load_data()
+except:
+    st.error("File data_simulasi_50_siswa_20_soal.xlsx tidak ditemukan.")
+    st.stop()
 
-    st.subheader("📋 Data Mentah")
-    st.dataframe(df)
+st.subheader("📋 Data Mentah")
+st.dataframe(df)
 
-    # Statistik Deskriptif
-    st.subheader("📈 Statistik Deskriptif")
-    st.write(df.describe())
+# Ambil hanya kolom numerik (nilai soal)
+df_numerik = df.select_dtypes(include="number")
 
-    # Sidebar untuk memilih kolom
-    st.sidebar.header("Pengaturan Visualisasi")
-    kolom = st.sidebar.selectbox("Pilih Kolom", df.columns)
+# ===============================
+# SIDEBAR FILTER
+# ===============================
+st.sidebar.header("Pengaturan Analisis")
 
-    # Diagram Batang
-    st.subheader("📊 Diagram Batang")
-    fig1, ax1 = plt.subplots()
-    df[kolom].value_counts().sort_index().plot(kind='bar', ax=ax1)
-    st.pyplot(fig1)
+kolom = st.sidebar.selectbox(
+    "Pilih Soal untuk Analisis Individu",
+    df_numerik.columns
+)
 
-    # Histogram
-    st.subheader("📉 Histogram")
-    fig2, ax2 = plt.subplots()
-    ax2.hist(df[kolom], bins=10)
-    ax2.set_xlabel(kolom)
-    ax2.set_ylabel("Frekuensi")
-    st.pyplot(fig2)
+# ===============================
+# STATISTIK DESKRIPTIF
+# ===============================
+st.subheader("📈 Statistik Deskriptif")
+st.write(df_numerik.describe())
 
-    # Boxplot
-    st.subheader("📦 Boxplot")
+# ===============================
+# RATA-RATA PER SOAL
+# ===============================
+st.subheader("📊 Rata-rata Skor Per Soal")
+mean_per_soal = df_numerik.mean()
+
+fig1, ax1 = plt.subplots(figsize=(10,5))
+mean_per_soal.plot(kind='bar', ax=ax1)
+ax1.set_ylabel("Rata-rata")
+ax1.set_xlabel("Soal")
+st.pyplot(fig1)
+
+# ===============================
+# DISTRIBUSI TOTAL NILAI
+# ===============================
+st.subheader("🎯 Distribusi Total Nilai Siswa")
+df["Total_Nilai"] = df_numerik.sum(axis=1)
+
+fig2, ax2 = plt.subplots()
+ax2.hist(df["Total_Nilai"], bins=10)
+ax2.set_xlabel("Total Nilai")
+ax2.set_ylabel("Jumlah Siswa")
+st.pyplot(fig2)
+
+# ===============================
+# ANALISIS PER SOAL (PILIHAN SIDEBAR)
+# ===============================
+st.subheader(f"📌 Analisis {kolom}")
+
+col1, col2 = st.columns(2)
+
+with col1:
     fig3, ax3 = plt.subplots()
-    ax3.boxplot(df[kolom])
-    ax3.set_title(f"Boxplot {kolom}")
+    ax3.hist(df[kolom], bins=10)
+    ax3.set_title("Histogram")
     st.pyplot(fig3)
 
-    # Rata-rata per Soal
-    st.subheader("📌 Rata-rata Skor Per Soal")
-    mean_per_soal = df.mean()
-    fig4, ax4 = plt.subplots(figsize=(10,5))
-    mean_per_soal.plot(kind='bar', ax=ax4)
-    ax4.set_ylabel("Rata-rata")
+with col2:
+    fig4, ax4 = plt.subplots()
+    ax4.boxplot(df[kolom])
+    ax4.set_title("Boxplot")
     st.pyplot(fig4)
 
-    # Distribusi Total Nilai per Siswa
-    st.subheader("🎯 Distribusi Total Nilai per Siswa")
-    df["Total_Nilai"] = df.sum(axis=1)
-    fig5, ax5 = plt.subplots()
-    ax5.hist(df["Total_Nilai"], bins=10)
-    ax5.set_xlabel("Total Nilai")
-    ax5.set_ylabel("Jumlah Siswa")
-    st.pyplot(fig5)
+# ===============================
+# HEATMAP KORELASI
+# ===============================
+st.subheader("🔥 Heatmap Korelasi Antar Soal")
 
-    # Heatmap Korelasi
-    st.subheader("🔥 Heatmap Korelasi Antar Soal")
-    fig6, ax6 = plt.subplots(figsize=(12,8))
-    sns.heatmap(df.corr(), annot=False, cmap="coolwarm", ax=ax6)
-    st.pyplot(fig6)
+fig5, ax5 = plt.subplots(figsize=(12,8))
+sns.heatmap(df_numerik.corr(), cmap="coolwarm", annot=False, ax=ax5)
+st.pyplot(fig5)
 
-else:
-    st.info("Silakan upload file Excel terlebih dahulu.")
+# ===============================
+# RANKING SISWA
+# ===============================
+st.subheader("🏆 Ranking Siswa Berdasarkan Total Nilai")
+
+df_ranking = df.sort_values(by="Total_Nilai", ascending=False)
+st.dataframe(df_ranking)
